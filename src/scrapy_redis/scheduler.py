@@ -1,9 +1,17 @@
 import importlib
-import six
+from typing import Optional
+from types import ModuleType
 
+import six
+from scrapy import Spider, Request
+from scrapy.crawler import Crawler
+from scrapy.settings import Settings
 from scrapy.utils.misc import load_object
+from redis import Redis
 
 from . import connection, defaults
+from .queue import Base
+from .dupefilter import BaseDupeFilter
 
 
 # TODO: add SCRAPY_JOB support.
@@ -31,15 +39,15 @@ class Scheduler(object):
 
     """
 
-    def __init__(self, server,
-                 persist=False,
-                 flush_on_start=False,
-                 queue_key=defaults.SCHEDULER_QUEUE_KEY,
-                 queue_cls=defaults.SCHEDULER_QUEUE_CLASS,
-                 dupefilter_key=defaults.SCHEDULER_DUPEFILTER_KEY,
-                 dupefilter_cls=defaults.SCHEDULER_DUPEFILTER_CLASS,
-                 idle_before_close=0,
-                 serializer=None):
+    def __init__(self, server: Redis,
+                 persist: Optional[bool] = False,
+                 flush_on_start: Optional[bool] = False,
+                 queue_key: Optional[str] = defaults.SCHEDULER_QUEUE_KEY,
+                 queue_cls: Optional[str] = defaults.SCHEDULER_QUEUE_CLASS,
+                 dupefilter_key: Optional[str] = defaults.SCHEDULER_DUPEFILTER_KEY,
+                 dupefilter_cls: Optional[str] = defaults.SCHEDULER_DUPEFILTER_CLASS,
+                 idle_before_close: Optional[int] = 0,
+                 serializer: Optional[ModuleType] = None):
         """Initialize scheduler.
 
         Parameters
@@ -76,11 +84,14 @@ class Scheduler(object):
         self.serializer = serializer
         self.stats = None
 
-    def __len__(self):
+        self.queue: Base = None
+        self.df: BaseDupeFilter = None
+
+    def __len__(self) -> int:
         return len(self.queue)
 
     @classmethod
-    def from_settings(cls, settings):
+    def from_settings(cls, settings: Settings) -> "Scheduler":
         kwargs = {
             'persist': settings.getbool('SCHEDULER_PERSIST'),
             'flush_on_start': settings.getbool('SCHEDULER_FLUSH_ON_START'),
@@ -114,13 +125,13 @@ class Scheduler(object):
         return cls(server=server, **kwargs)
 
     @classmethod
-    def from_crawler(cls, crawler):
+    def from_crawler(cls, crawler: Crawler):
         instance = cls.from_settings(crawler.settings)
         # FIXME: for now, stats are only supported from this constructor
         instance.stats = crawler.stats
         return instance
 
-    def open(self, spider):
+    def open(self, spider: Spider) -> None:
         self.spider = spider
 
         try:
@@ -142,15 +153,15 @@ class Scheduler(object):
         if len(self.queue):
             spider.log("Resuming crawl (%d requests scheduled)" % len(self.queue))
 
-    def close(self, reason):
+    def close(self, reason) -> None:
         if not self.persist:
             self.flush()
 
-    def flush(self):
+    def flush(self) -> None:
         self.df.clear()
         self.queue.clear()
 
-    def enqueue_request(self, request):
+    def enqueue_request(self, request: Request) -> bool:
         if not request.dont_filter and self.df.request_seen(request):
             self.df.log(request, self.spider)
             return False
@@ -159,12 +170,12 @@ class Scheduler(object):
         self.queue.push(request)
         return True
 
-    def next_request(self):
+    def next_request(self) -> Request:
         block_pop_timeout = self.idle_before_close
         request = self.queue.pop(block_pop_timeout)
         if request and self.stats:
             self.stats.inc_value('scheduler/dequeued/redis', spider=self.spider)
         return request
 
-    def has_pending_requests(self):
+    def has_pending_requests(self) -> bool:
         return len(self) > 0

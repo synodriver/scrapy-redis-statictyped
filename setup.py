@@ -28,7 +28,7 @@ def read_requirements(filename):
 
 
 setup(
-    name='scrapy-redis',
+    name='scrapy-redis-statictyped',
     version=read_file('VERSION'),
     description="Redis-based components for Scrapy.",
     long_description=read_rst('README.rst') + '\n\n' + read_rst('HISTORY.rst'),

@@ -1,18 +1,22 @@
 import logging
 import time
+from typing import Optional, AnyStr
 
+from scrapy import Request, Spider
 from scrapy.dupefilters import BaseDupeFilter
 from scrapy.utils.request import request_fingerprint
+from scrapy.settings import Settings
+from scrapy.crawler import Crawler
+
+from redis import Redis
 
 from . import defaults
 from .connection import get_redis_from_settings
 
-
 logger = logging.getLogger(__name__)
 
 
-# TODO: Rename class to RedisDupeFilter.
-class RFPDupeFilter(BaseDupeFilter):
+class RedisDupeFilter(BaseDupeFilter):
     """Redis-based request duplicates filter.
 
     This class can also be used with default Scrapy's scheduler.
@@ -21,7 +25,7 @@ class RFPDupeFilter(BaseDupeFilter):
 
     logger = logger
 
-    def __init__(self, server, key, debug=False):
+    def __init__(self, server: Redis, key: AnyStr, debug: Optional[bool] = False):
         """Initialize the duplicates filter.
 
         Parameters
@@ -40,7 +44,7 @@ class RFPDupeFilter(BaseDupeFilter):
         self.logdupes = True
 
     @classmethod
-    def from_settings(cls, settings):
+    def from_settings(cls, settings: Settings) -> "RedisDupeFilter":
         """Returns an instance from given settings.
 
         This uses by default the key ``dupefilter:<timestamp>``. When using the
@@ -68,7 +72,7 @@ class RFPDupeFilter(BaseDupeFilter):
         return cls(server, key=key, debug=debug)
 
     @classmethod
-    def from_crawler(cls, crawler):
+    def from_crawler(cls, crawler: Crawler) -> "RedisDupeFilter":
         """Returns instance from crawler.
 
         Parameters
@@ -83,7 +87,7 @@ class RFPDupeFilter(BaseDupeFilter):
         """
         return cls.from_settings(crawler.settings)
 
-    def request_seen(self, request):
+    def request_seen(self, request: Request) -> bool:
         """Returns True if request was already seen.
 
         Parameters
@@ -100,7 +104,7 @@ class RFPDupeFilter(BaseDupeFilter):
         added = self.server.sadd(self.key, fp)
         return added == 0
 
-    def request_fingerprint(self, request):
+    def request_fingerprint(self, request: Request) -> AnyStr:
         """Returns a fingerprint for a given request.
 
         Parameters
@@ -115,7 +119,7 @@ class RFPDupeFilter(BaseDupeFilter):
         return request_fingerprint(request)
 
     @classmethod
-    def from_spider(cls, spider):
+    def from_spider(cls, spider: Spider) -> "RedisDupeFilter":
         settings = spider.settings
         server = get_redis_from_settings(settings)
         dupefilter_key = settings.get("SCHEDULER_DUPEFILTER_KEY", defaults.SCHEDULER_DUPEFILTER_KEY)
@@ -123,7 +127,7 @@ class RFPDupeFilter(BaseDupeFilter):
         debug = settings.getbool('DUPEFILTER_DEBUG')
         return cls(server, key=key, debug=debug)
 
-    def close(self, reason=''):
+    def close(self, reason: Optional[str] = '') -> None:
         """Delete data on close. Called by Scrapy's scheduler.
 
         Parameters
@@ -133,11 +137,11 @@ class RFPDupeFilter(BaseDupeFilter):
         """
         self.clear()
 
-    def clear(self):
+    def clear(self) -> None:
         """Clears fingerprints data."""
         self.server.delete(self.key)
 
-    def log(self, request, spider):
+    def log(self, request: Request, spider: Spider) -> None:
         """Logs given request.
 
         Parameters

@@ -7,6 +7,8 @@ include *.in
 include *.ini
 include *.rst
 include *.txt
+include *.typed
+include *.pyi
 
 include LICENSE
 include VERSION

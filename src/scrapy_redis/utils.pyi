@@ -1,0 +1,3 @@
+from typing import Any
+
+def bytes_to_str(s: Any, encoding: str=...) -> Any: ...

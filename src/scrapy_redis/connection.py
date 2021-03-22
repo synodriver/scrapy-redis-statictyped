@@ -1,14 +1,16 @@
 import sys
+from typing import Dict
 
 import six
 
 from scrapy.utils.misc import load_object
+from scrapy.settings import Settings
+from redis import Redis
 
 from . import defaults
 
-
 # Shortcut maps 'setting name' -> 'parmater name'.
-SETTINGS_PARAMS_MAP = {
+SETTINGS_PARAMS_MAP: Dict[str, str] = {
     'REDIS_URL': 'url',
     'REDIS_HOST': 'host',
     'REDIS_PORT': 'port',
@@ -20,7 +22,7 @@ if sys.version_info > (3,):
     SETTINGS_PARAMS_MAP['REDIS_DECODE_RESPONSES'] = 'decode_responses'
 
 
-def get_redis_from_settings(settings):
+def get_redis_from_settings(settings: Settings) -> Redis:
     """Returns a redis client instance from given Scrapy settings object.
 
     This function uses ``get_client`` to instantiate the client and uses
@@ -77,7 +79,7 @@ def get_redis_from_settings(settings):
 from_settings = get_redis_from_settings
 
 
-def get_redis(**kwargs):
+def get_redis(**kwargs) -> Redis:
     """Returns a redis client instance.
 
     Parameters

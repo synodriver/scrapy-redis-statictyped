@@ -1,8 +1,12 @@
-from scrapy import signals
+from collections import Iterable
+from typing import Union, Optional, Generator, NoReturn
+
+from scrapy import signals, Request
+from scrapy.crawler import Crawler
+from scrapy.settings import Settings
 from scrapy.exceptions import DontCloseSpider
 from scrapy.spiders import Spider, CrawlSpider
-from collections import Iterable
-
+from redis import Redis
 
 from . import connection, defaults
 from .utils import bytes_to_str
@@ -10,18 +14,18 @@ from .utils import bytes_to_str
 
 class RedisMixin(object):
     """Mixin class to implement reading urls from a redis queue."""
-    redis_key = None
-    redis_batch_size = None
-    redis_encoding = None
+    redis_key: str = None
+    redis_batch_size: int = None
+    redis_encoding: str = None
 
     # Redis client placeholder.
-    server = None
+    server: Redis = None
 
-    def start_requests(self):
+    def start_requests(self) -> Generator[Request, None, None]:
         """Returns a batch of start requests from redis."""
         return self.next_requests()
 
-    def setup_redis(self, crawler=None):
+    def setup_redis(self, crawler: Optional[Crawler] = None):
         """Setup redis connection and idle signal.
 
         This should be called after the spider has set its crawler object.
@@ -38,7 +42,7 @@ class RedisMixin(object):
         if crawler is None:
             raise ValueError("crawler is required")
 
-        settings = crawler.settings
+        settings: Settings = crawler.settings
 
         if self.redis_key is None:
             self.redis_key = settings.get(
@@ -82,21 +86,21 @@ class RedisMixin(object):
         # that's when we will schedule new requests from redis queue
         crawler.signals.connect(self.spider_idle, signal=signals.spider_idle)
 
-    def pop_list_queue(self, redis_key, batch_size):
+    def pop_list_queue(self, redis_key: str, batch_size: int) -> list:
         with self.server.pipeline() as pipe:
             pipe.lrange(redis_key, 0, batch_size - 1)
             pipe.ltrim(redis_key, batch_size, -1)
             datas, _ = pipe.execute()
         return datas
 
-    def pop_priority_queue(self, redis_key, batch_size):
+    def pop_priority_queue(self, redis_key: str, batch_size: int) -> list:
         with self.server.pipeline() as pipe:
             pipe.zrevrange(redis_key, 0, batch_size - 1)
             pipe.zremrangebyrank(redis_key, -batch_size, -1)
             datas, _ = pipe.execute()
         return datas
 
-    def next_requests(self):
+    def next_requests(self) -> Generator[Request, None, None]:
         """Returns a request to be scheduled or none."""
         # XXX: Do we need to use a timeout here?
         found = 0
@@ -118,7 +122,7 @@ class RedisMixin(object):
         if found:
             self.logger.debug("Read %s requests from '%s'", found, self.redis_key)
 
-    def make_request_from_data(self, data):
+    def make_request_from_data(self, data: Union[str, bytes]) -> Request:
         """Returns a Request instance from data coming from Redis.
 
         By default, ``data`` is an encoded URL. You can override this method to
@@ -131,15 +135,15 @@ class RedisMixin(object):
 
         """
         url = bytes_to_str(data, self.redis_encoding)
-        return self.make_requests_from_url(url)
+        return Request(url, dont_filter=True)
 
-    def schedule_next_requests(self):
+    def schedule_next_requests(self) -> None:
         """Schedules a request if available"""
         # TODO: While there is capacity, schedule a batch of redis requests.
         for req in self.next_requests():
             self.crawler.engine.crawl(req, spider=self)
 
-    def spider_idle(self):
+    def spider_idle(self) -> NoReturn:
         """Schedules a request if available, otherwise waits."""
         # XXX: Handle a sentinel to close the spider.
         self.schedule_next_requests()
@@ -173,8 +177,8 @@ class RedisSpider(RedisMixin, Spider):
     """
 
     @classmethod
-    def from_crawler(self, crawler, *args, **kwargs):
-        obj = super(RedisSpider, self).from_crawler(crawler, *args, **kwargs)
+    def from_crawler(cls, crawler, *args, **kwargs) -> "RedisSpider":
+        obj = super().from_crawler(crawler, *args, **kwargs)
         obj.setup_redis(crawler)
         return obj
 
@@ -205,7 +209,7 @@ class RedisCrawlSpider(RedisMixin, CrawlSpider):
     """
 
     @classmethod
-    def from_crawler(self, crawler, *args, **kwargs):
-        obj = super(RedisCrawlSpider, self).from_crawler(crawler, *args, **kwargs)
+    def from_crawler(cls, crawler: Crawler, *args, **kwargs) -> "RedisCrawlSpider":
+        obj = super().from_crawler(crawler, *args, **kwargs)
         obj.setup_redis(crawler)
         return obj

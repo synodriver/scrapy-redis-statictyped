@@ -1,4 +1,10 @@
+from typing import Optional, AnyStr, Callable, Union
+
+from scrapy import Request
 from scrapy.utils.reqser import request_to_dict, request_from_dict
+from scrapy import Spider
+
+from redis import Redis
 
 from . import picklecompat
 
@@ -6,7 +12,10 @@ from . import picklecompat
 class Base(object):
     """Per-spider base queue class"""
 
-    def __init__(self, server, spider, key, serializer=None):
+    def __init__(self, server: Redis,
+                 spider: Spider,
+                 key: AnyStr,
+                 serializer: Optional[Callable[[dict], str]] = None):
         """Initialize per-spider redis queue.
 
         Parameters
@@ -37,12 +46,12 @@ class Base(object):
         self.key = key % {'spider': spider.name}
         self.serializer = serializer
 
-    def _encode_request(self, request):
+    def _encode_request(self, request: Request):
         """Encode a request object"""
         obj = request_to_dict(request, self.spider)
         return self.serializer.dumps(obj)
 
-    def _decode_request(self, encoded_request):
+    def _decode_request(self, encoded_request: AnyStr):
         """Decode an request previously encoded"""
         obj = self.serializer.loads(encoded_request)
         return request_from_dict(obj, self.spider)
@@ -51,15 +60,15 @@ class Base(object):
         """Return the length of the queue"""
         raise NotImplementedError
 
-    def push(self, request):
+    def push(self, request: Request):
         """Push a request"""
         raise NotImplementedError
 
-    def pop(self, timeout=0):
+    def pop(self, timeout: Optional[Union[int, float]] = 0):
         """Pop a request"""
         raise NotImplementedError
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear queue/stack"""
         self.server.delete(self.key)
 
@@ -67,15 +76,15 @@ class Base(object):
 class FifoQueue(Base):
     """Per-spider FIFO queue"""
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the length of the queue"""
         return self.server.llen(self.key)
 
-    def push(self, request):
+    def push(self, request: Request) -> int:
         """Push a request"""
         self.server.lpush(self.key, self._encode_request(request))
 
-    def pop(self, timeout=0):
+    def pop(self, timeout: Optional[int] = 0) -> Request:
         """Pop a request"""
         if timeout > 0:
             data = self.server.brpop(self.key, timeout)
@@ -90,11 +99,11 @@ class FifoQueue(Base):
 class PriorityQueue(Base):
     """Per-spider priority queue abstraction using redis' sorted set"""
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the length of the queue"""
         return self.server.zcard(self.key)
 
-    def push(self, request):
+    def push(self, request: Request) -> None:
         """Push a request"""
         data = self._encode_request(request)
         score = -request.priority
@@ -103,7 +112,7 @@ class PriorityQueue(Base):
         # kwargs only accepts strings, not bytes.
         self.server.execute_command('ZADD', self.key, score, data)
 
-    def pop(self, timeout=0):
+    def pop(self, timeout: Optional[Union[int, float]] = 0) -> Request:
         """
         Pop a request
         timeout not support in this queue class
@@ -120,15 +129,15 @@ class PriorityQueue(Base):
 class LifoQueue(Base):
     """Per-spider LIFO queue."""
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the length of the stack"""
         return self.server.llen(self.key)
 
-    def push(self, request):
+    def push(self, request: Request) -> None:
         """Push a request"""
         self.server.lpush(self.key, self._encode_request(request))
 
-    def pop(self, timeout=0):
+    def pop(self, timeout: Optional[Union[int, float]] = 0) -> Request:
         """Pop a request"""
         if timeout > 0:
             data = self.server.blpop(self.key, timeout)

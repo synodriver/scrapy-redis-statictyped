@@ -1,5 +1,5 @@
 ============
-Scrapy-Redis
+Scrapy-Redis-Statictyped
 ============
 
 .. image:: https://readthedocs.org/projects/scrapy-redis/badge/?version=latest
@@ -28,10 +28,12 @@ Scrapy-Redis
     :target: https://requires.io/github/rolando/scrapy-redis/requirements/?branch=master
 
 Redis-based components for Scrapy.
+Forked from Scrapy-Redis to provide modern feature for latest python version and scrapy
+
 
 * Free software: MIT license
 * Documentation: https://scrapy-redis.readthedocs.org.
-* Python versions: 2.7, 3.4+
+* Python versions: 3.6+
 
 Features
 --------
@@ -55,10 +57,10 @@ Features
 Requirements
 ------------
 
-* Python 2.7, 3.4 or 3.5
-* Redis >= 2.8
-* ``Scrapy`` >= 1.1
-* ``redis-py`` >= 2.10
+* Python 3.6+
+* Redis >= 3.2
+* ``Scrapy`` >= 2.0
+* ``redis-py`` >= 3.5
 
 Usage
 -----
