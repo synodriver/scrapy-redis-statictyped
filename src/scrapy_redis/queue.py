@@ -5,6 +5,7 @@ from scrapy.utils.reqser import request_to_dict, request_from_dict
 from scrapy import Spider
 
 from redis import Redis
+from rediscluster import RedisCluster
 
 from . import picklecompat
 
@@ -12,7 +13,7 @@ from . import picklecompat
 class Base(object):
     """Per-spider base queue class"""
 
-    def __init__(self, server: Redis,
+    def __init__(self, server: Union[Redis, RedisCluster],
                  spider: Spider,
                  key: AnyStr,
                  serializer: Optional[Callable[[dict], str]] = None):
@@ -117,13 +118,21 @@ class PriorityQueue(Base):
         Pop a request
         timeout not support in this queue class
         """
-        # use atomic range/remove using multi/exec
-        pipe = self.server.pipeline()
-        pipe.multi()
-        pipe.zrange(self.key, 0, 0).zremrangebyrank(self.key, 0, 0)
-        results, count = pipe.execute()
-        if results:
-            return self._decode_request(results[0])
+        # use atomic range/remove using lua script
+        lua_script = """
+                    local result = redis.call('zrange', KEYS[1], 0, 0)
+                    local element = result[1]
+                    if element then
+                        redis.call('zremrangebyrank', KEYS[1], 0, 0)
+                        return element
+                    else
+                        return nil
+                    end
+                    """
+        script = self.server.register_script(lua_script)
+        result = script(keys=[self.key])
+        if result:
+            return self._decode_request(result)
 
 
 class LifoQueue(Base):

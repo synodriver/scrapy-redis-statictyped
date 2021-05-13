@@ -9,7 +9,7 @@ from twisted.internet.threads import deferToThread
 
 from redis import Redis
 
-from . import connection, defaults
+from . import connection, defaults  # type: ignore
 
 default_serialize = ScrapyJSONEncoder().encode
 
@@ -28,7 +28,7 @@ class RedisPipeline(object):
 
     def __init__(self, server: Redis,
                  key: Optional[str] = defaults.PIPELINE_KEY,
-                 serialize_func: Optional[Callable[[dict], str]] = default_serialize):
+                 serialize_func: Callable[[dict], str] = default_serialize):
         """Initialize pipeline.
 
         Parameters
