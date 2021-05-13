@@ -5,6 +5,7 @@ from scrapy.crawler import Crawler
 from scrapy import Spider
 from .connection import from_settings as redis_from_settings
 from .defaults import STATS_KEY, SCHEDULER_PERSIST
+from datetime import datetime
 
 
 class RedisStatsCollector(StatsCollector):
@@ -33,6 +34,10 @@ class RedisStatsCollector(StatsCollector):
     def from_crawler(cls, crawler: Crawler) -> "RedisStatsCollector":
         return cls(crawler)
 
+    @classmethod
+    def from_spider(cls, spider):
+        return cls(spider.crawler)
+
     def get_value(self, key: AnyStr, default: Optional[int] = None, spider: Optional[Spider] = None) -> Optional[int]:
         """Return the value of hash stats"""
         if self.server.hexists(self._get_key(spider), key):
@@ -46,7 +51,9 @@ class RedisStatsCollector(StatsCollector):
 
     def set_value(self, key: AnyStr, value: Union[AnyStr, int], spider: Optional[Spider] = None):
         """Set the value according to hash key of stats"""
-        self.server.hset(self._get_key(spider), key, str(value))
+        if isinstance(value, datetime):
+            value = value.timestamp()
+        self.server.hset(self._get_key(spider), key, value)
 
     def set_stats(self, stats: dict, spider: Optional[Spider] = None):
         """Set all the hash stats"""
@@ -68,7 +75,7 @@ class RedisStatsCollector(StatsCollector):
         self.set_value(key, min(self.get_value(key, value), value))
 
     def clear_stats(self, spider: Optional[Spider] = None):
-        """Clarn all the hash stats"""
+        """Clear all the hash stats"""
         self.server.delete(self._get_key(spider))
 
     def open_spider(self, spider: Spider):
