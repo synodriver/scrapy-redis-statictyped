@@ -44,12 +44,7 @@ SCHEDULER_QUEUE_KEY = '%(spider)s:requests'
 SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.PriorityQueue'
 SCHEDULER_DUPEFILTER_KEY = '%(spider)s:dupefilter'
 SCHEDULER_DUPEFILTER_CLASS = 'scrapy_redis.dupefilter.RedisDupeFilter'
-# SCHEDULER_DUPEFILTER_KEY_LIST = '%(spider)s:dupefilter_list'
-# SCHEDULER_DUPEFILTER_RULES_LIST = []
-# Redis BloomFilter 锁需要的 key 与超时时间，去重类使用 LockRFPDupeFilter 时有效 我是原子性bloom 不需要lock
-# SCHEDULER_DUPEFILTER_LOCK_KEY = '%(spider)s:lock'
-# SCHEDULER_DUPEFILTER_LOCK_NUM = 16  # Redis bloomfilter 锁个数，可以设置值：16，256，4096
-# SCHEDULER_DUPEFILTER_LOCK_TIMEOUT = 15
+
 SCHEDULER_PERSIST = False
 
 START_URLS_KEY = '%(name)s:start_urls'

@@ -2,3 +2,5 @@
 Scrapy>=1.0
 redis>=2.10
 six>=1.5.2
+redis-py-cluster>=2.1.2
+pyfilters
