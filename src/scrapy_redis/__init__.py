@@ -4,6 +4,8 @@ from .connection import (  # NOQA
     get_redis_from_settings,
 )
 
+<<<<<<< HEAD
 __author__ = 'synodriver'
 __email__ = 'diguohuangjiajinweijun@gmail.com'
-__version__ = '0.7.1'
+__version__ = '0.7.2'
+
