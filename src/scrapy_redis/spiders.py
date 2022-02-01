@@ -1,11 +1,12 @@
-from collections import Iterable
+import json
+from collections.abc import Iterable
 import time
 from typing import Union, Optional, Generator, NoReturn
 
-from scrapy import signals, Request
-from scrapy.crawler import Crawler
-from scrapy.settings import Settings
+from scrapy import signals, FormRequest, Request
 from scrapy.exceptions import DontCloseSpider
+from scrapy.settings import Settings
+from scrapy.crawler import Crawler
 from scrapy.spiders import Spider, CrawlSpider
 from redis import Redis
 
@@ -24,6 +25,7 @@ class RedisMixin(object):
 
     # Idle start time
     spider_idle_start_time = int(time.time())
+    max_idle_time = None
 
     def start_requests(self) -> Generator[Request, None, None]:
         """Returns a batch of start requests from redis."""
@@ -79,15 +81,26 @@ class RedisMixin(object):
 
         self.server = connection.from_settings(crawler.settings)
 
-        if self.settings.getbool('REDIS_START_URLS_AS_SET', defaults.START_URLS_AS_SET):
+        if settings.getbool('REDIS_START_URLS_AS_SET', defaults.START_URLS_AS_SET):
             self.fetch_data = self.server.spop
             self.count_size = self.server.scard
-        elif self.settings.getbool('REDIS_START_URLS_AS_ZSET', defaults.START_URLS_AS_ZSET):
+        elif settings.getbool('REDIS_START_URLS_AS_ZSET', defaults.START_URLS_AS_ZSET):
             self.fetch_data = self.pop_priority_queue
             self.count_size = self.server.zcard
         else:
             self.fetch_data = self.pop_list_queue
             self.count_size = self.server.llen
+
+        if self.max_idle_time is None:
+            self.max_idle_time = settings.getint(
+                "MAX_IDLE_TIME_BEFORE_CLOSE",
+                defaults.MAX_IDLE_TIME
+            )
+
+        try:
+            self.max_idle_time = int(self.max_idle_time)
+        except (TypeError, ValueError):
+            raise ValueError("max_idle_time must be an integer")
 
         # The idle signal is called when the spider has no requests left,
         # that's when we will schedule new requests from redis queue
@@ -132,8 +145,17 @@ class RedisMixin(object):
     def make_request_from_data(self, data: Union[str, bytes]) -> Request:
         """Returns a Request instance from data coming from Redis.
 
-        By default, ``data`` is an encoded URL. You can override this method to
-        provide your own message decoding.
+        Overriding this function to support the 'json' requested ``data`` that contains
+        `url` ,`meta` and other optional parameters. `meta` is a nested json which contains sub-data.
+
+        Along with:
+        After accessing the data, sending the FormRequest with `url`, `meta` and addition `formdata`
+
+        For example:
+        {"url": "https://exaple.com", "meta": {'job-id':'123xsd', 'start-date':'dd/mm/yy'}, "url_cookie_key":"fertxsas" }
+
+        this data can be accessed from 'scrapy.spider' through response.
+        'response.url', 'response.meta', 'response.url_cookie_key'
 
         Parameters
         ----------
@@ -141,8 +163,21 @@ class RedisMixin(object):
             Message from redis.
 
         """
-        url = bytes_to_str(data, self.redis_encoding)
-        return Request(url, dont_filter=True)
+        # url = bytes_to_str(data, self.redis_encoding)
+        formatted_data = bytes_to_str(data, self.redis_encoding)
+
+        # change to json array
+        parameter = json.loads(formatted_data)
+        url = parameter['url']
+        del parameter['url']
+        metadata = {}
+        try:
+            metadata = parameter['meta']
+            del parameter['meta']
+        except:
+            pass
+
+        return FormRequest(url, dont_filter=True, formdata=parameter, meta=metadata)
 
     def schedule_next_requests(self) -> None:
         """Schedules a request if available"""
@@ -160,9 +195,8 @@ class RedisMixin(object):
             self.spider_idle_start_time = int(time.time())
         self.schedule_next_requests()
 
-        max_idle_time = self.settings.getint("MAX_IDLE_TIME_BEFORE_CLOSE")
         idle_time = int(time.time()) - self.spider_idle_start_time
-        if max_idle_time != 0 and idle_time >= max_idle_time:
+        if self.max_idle_time != 0 and idle_time >= self.max_idle_time:
             return
         raise DontCloseSpider
 
