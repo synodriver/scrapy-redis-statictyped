@@ -108,7 +108,7 @@ class MockRequest(mock.Mock):
         return hash(self.url)
 
     def __repr__(self):
-        return '<%s(%s)>' % (self.__class__.__name__, self.url)
+        return f'<{self.__class__.__name__}({self.url})>'
 
 
 @pytest.mark.parametrize('spider_cls', [

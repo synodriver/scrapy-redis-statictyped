@@ -110,8 +110,7 @@ class Scheduler(object):
             'serializer': 'SCHEDULER_SERIALIZER',
         }
         for name, setting_name in optional.items():
-            val = settings.get(setting_name)
-            if val:
+            if val := settings.get(setting_name):
                 kwargs[name] = val
 
         # Support serializer as a path to a module.

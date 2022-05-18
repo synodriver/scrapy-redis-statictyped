@@ -53,7 +53,7 @@ class TestRFPDupeFilter(object):
 def test_log_dupes():
     def _test(df, dupes, logcount):
         df.logger.debug = mock.Mock(wraps=df.logger.debug)
-        for i in range(dupes):
+        for _ in range(dupes):
             req = Request('http://example')
             df.log(req, spider=mock.Mock())
         assert df.logger.debug.call_count == logcount

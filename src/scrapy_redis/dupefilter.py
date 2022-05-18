@@ -243,9 +243,7 @@ class RedisBloomDupeFilter(RedisDupeFilter):
 
         """
         fp = self.request_fingerprint(request)
-        # This returns if the fp is added, False if already exists.
-        added = self.bf.add(fp)
-        return added
+        return self.bf.add(fp)
 
     def clear(self) -> None:
         """Clears fingerprints data."""

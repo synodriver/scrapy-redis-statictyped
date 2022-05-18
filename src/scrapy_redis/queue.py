@@ -130,8 +130,7 @@ class PriorityQueue(Base):
                     end
                     """
         script = self.server.register_script(lua_script)
-        result = script(keys=[self.key])
-        if result:
+        if result := script(keys=[self.key]):
             return self._decode_request(result)
 
 

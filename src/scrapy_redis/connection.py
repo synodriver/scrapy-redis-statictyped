@@ -82,8 +82,7 @@ def get_redis_from_settings(settings: Settings) -> Redis:
     params.update(settings.getdict('REDIS_PARAMS'))
     # XXX: Deprecate REDIS_* settings.
     for source, dest in SETTINGS_PARAMS_MAP.items():
-        val = settings.get(source)
-        if val:
+        if val := settings.get(source):
             params[dest] = val
 
     # Allow ``redis_cls`` to be a path to a class.
@@ -112,8 +111,7 @@ def get_redis(**kwargs) -> Redis:
 
     """
     redis_cls = kwargs.pop('redis_cls', defaults.REDIS_CLS)
-    url = kwargs.pop('url', None)
-    if url:
+    if url := kwargs.pop('url', None):
         return redis_cls.from_url(url, **kwargs)
     else:
         return redis_cls(**kwargs)
@@ -124,8 +122,7 @@ def get_redis_cluster_from_settings(settings: Settings):
     params.update(settings.getdict('REDIS_CLUSTER_PARAMS'))
     # XXX: Deprecate REDIS_CLUSTER* settings.
     for setting_name, name in REDIS_CLUSTER_SETTINGS_PARAMS_MAP.items():
-        val = settings.get(setting_name)
-        if val:
+        if val := settings.get(setting_name):
             params[name] = val
 
     # Allow ``redis_cluster_cls`` to be a path to a class.
@@ -146,14 +143,13 @@ def get_redis_cluster(**kwargs):
         kwargs.pop('db')
     except KeyError:
         pass
-    if url:
-        try:
-            kwargs.pop('startup_nodes')
-        except KeyError:
-            pass
-        return redis_cluster_cls.from_url(url, **kwargs)
-    else:
+    if not url:
         return redis_cluster_cls(**kwargs)
+    try:
+        kwargs.pop('startup_nodes')
+    except KeyError:
+        pass
+    return redis_cluster_cls.from_url(url, **kwargs)
 
 
 def get_redis_sentinel_from_settings(settings: Settings):
@@ -161,8 +157,7 @@ def get_redis_sentinel_from_settings(settings: Settings):
     params.update(settings.getdict('REDIS_SENTINEL_PARAMS'))
     # XXX: Deprecate REDIS_CLUSTER* settings.
     for setting_name, name in REDIS_SENTINEL_SETTINGS_PARAMS_MAP.items():
-        val = settings.get(setting_name)
-        if val:
+        if val := settings.get(setting_name):
             params[name] = val
 
     # Allow ``redis_cluster_cls`` to be a path to a class.

@@ -34,8 +34,7 @@ class RedisTestMixin(object):
         return self._redis
 
     def clear_keys(self, prefix):
-        keys = self.server.keys(prefix + '*')
-        if keys:
+        if keys := self.server.keys(f'{prefix}*'):
             self.server.delete(*keys)
 
 
@@ -63,7 +62,7 @@ class QueueTestMixin(RedisTestMixin):
 
     def setUp(self):
         self.spider = get_spider(name='myspider')
-        self.key = 'scrapy_redis:tests:%s:queue' % self.spider.name
+        self.key = f'scrapy_redis:tests:{self.spider.name}:queue'
         self.q = self.queue_cls(self.server, Spider('myspider'), self.key)
 
     def tearDown(self):
@@ -80,7 +79,7 @@ class QueueTestMixin(RedisTestMixin):
             # duplication filter whenever the serielized requests are the same.
             # This might be unwanted on repetitive requests to the same page
             # even with dont_filter=True flag.
-            req = Request('http://example.com/?page=%s' % i)
+            req = Request(f'http://example.com/?page={i}')
             self.q.push(req)
         self.assertEqual(len(self.q), 10)
 
@@ -150,8 +149,8 @@ class SchedulerTest(RedisTestMixin, TestCase):
 
     def setUp(self):
         self.key_prefix = 'scrapy_redis:tests:'
-        self.queue_key = self.key_prefix + '%(spider)s:requests'
-        self.dupefilter_key = self.key_prefix + '%(spider)s:dupefilter'
+        self.queue_key = f'{self.key_prefix}%(spider)s:requests'
+        self.dupefilter_key = f'{self.key_prefix}%(spider)s:dupefilter'
         self.spider = get_spider(name='myspider', settings_dict={
             'REDIS_HOST': REDIS_HOST,
             'REDIS_PORT': REDIS_PORT,
